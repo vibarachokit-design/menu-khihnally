@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Espacio Kihnally - Bienvenida</title>
+    <style>
+        /* ===== RESET Y BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #1a1410;
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+        }
+
+        /* ===== CONTENEDOR DEL VIDEO ===== */
+        .contenedor-video {
+            max-width: 800px;
+            width: 100%;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            aspect-ratio: 16 / 9;
+        }
+
+        .contenedor-video iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        /* ===== MENSAJE DE CARGA ===== */
+        .info-carga {
+            color: #f5ede4;
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9em;
+            opacity: 0.6;
+            letter-spacing: 1px;
+            transition: opacity 0.5s;
+        }
+
+        .info-carga.oculto {
+            opacity: 0;
+        }
+
+        .info-carga span {
+            display: inline-block;
+            animation: puntos 1.4s infinite;
+        }
+
+        @keyframes puntos {
+            0%,
+            20% {
+                opacity: 0;
+            }
+            40% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* ===== MENSAJE DE REDIRECCIÓN ===== */
+        .mensaje-redireccion {
+            color: #d4a373;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.1em;
+            display: none;
+            font-weight: bold;
+        }
+
+        .mensaje-redireccion.mostrar {
+            display: block;
+            animation: parpadeo 1s ease-in-out infinite;
+        }
+
+        @keyframes parpadeo {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* ===== BOTÓN SALTAR ===== */
+        .btn-saltar {
+            background: transparent;
+            color: #f5ede4;
+            border: 1px solid #4a3a30;
+            padding: 10px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 0.9em;
+            transition: all 0.3s;
+            display: none;
+        }
+
+        .btn-saltar:hover {
+            background: #d4a373;
+            color: #1a1410;
+            border-color: #d4a373;
+        }
+
+        .btn-saltar.mostrar {
+            display: inline-block;
+        }
+
+        /* ===== FALLBACK (SI EL VIDEO FALLA) ===== */
+        .fallback {
+            display: none;
+            color: #f5ede4;
+            background: #2a1f18;
+            padding: 30px 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            text-align: center;
+            border: 1px solid #4a3a30;
+        }
+
+        .fallback a {
+            color: #d4a373;
+            font-weight: bold;
+            text-decoration: none;
+            border-bottom: 2px solid #d4a373;
+            padding-bottom: 2px;
+        }
+
+        .fallback a:hover {
+            color: #e8c9a0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ===== VIDEO DE YOUTUBE ===== -->
+    <div class="contenedor-video">
+        <iframe
+        id="videoYouTube"
+        src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1"
+        allow="autoplay; encrypted-media; fullscreen"
+        allowfullscreen>
+    </iframe>
+</div>
+
+<!-- ===== MENSAJE DE CARGA ===== -->
+<div class="info-carga" id="infoCarga">
+    <span>●</span> Cargando video de bienvenida <span>●</span>
+</div>
+
+<!-- ===== MENSAJE DE REDIRECCIÓN ===== -->
+<div class="mensaje-redireccion" id="mensajeRedireccion">
+    ✨ ¡Gracias por visitarnos! Redirigiendo al menú...
+</div>
+
+<!-- ===== BOTÓN PARA SALTAR EL VIDEO ===== -->
+<button class="btn-saltar" id="btnSaltar" onclick="redirigirAlMenu()">
+    Saltar al menú →
+</button>
+
+<!-- ===== MENSAJE DE FALLBACK ===== -->
+<div class="fallback" id="fallback">
+    <p>⏳ El video no se pudo cargar automáticamente</p>
+    <p style="margin-top:10px;">
+        Haz clic aquí para ir directamente al
+        <a href="https://espacio-kihnally.ola.click/products">menú de Espacio Kihnally</a>
+    </p>
+</div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+    // ===== CONFIGURACIÓN =====
+    const URL_MENU = 'https://espacio-kihnally.ola.click/products';
+    let redireccionRealizada = false;
+    let tiempoEspera = 0;
+    const TIEMPO_MAXIMO = 120; // segundos
+    let playerReady = false;
+
+    // ===== ELEMENTOS DOM =====
+    const infoCarga = document.getElementById('infoCarga');
+    const mensajeRedireccion = document.getElementById('mensajeRedireccion');
+    const fallback = document.getElementById('fallback');
+    const btnSaltar = document.getElementById('btnSaltar');
+
+    // ===== FUNCIÓN PRINCIPAL: REDIRIGIR =====
+    function redirigirAlMenu() {
+        if (redireccionRealizada) return;
+        redireccionRealizada = true;
+
+        infoCarga.classList.add('oculto');
+        mensajeRedireccion.classList.add('mostrar');
+        btnSaltar.classList.remove('mostrar');
+
+        setTimeout(() => {
+            window.location.href = URL_MENU;
+        }, 800);
+    }
+
+    // ===== MOSTRAR BOTÓN "SALTAR" A LOS 5 SEGUNDOS =====
+    setTimeout(() => {
+        if (!redireccionRealizada) {
+            btnSaltar.classList.add('mostrar');
+        }
+    }, 5000);
+
+    // ===== CARGAR API DE YOUTUBE =====
+    function cargarAPIYouTube() {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+
+    // ===== CUANDO LA API ESTÁ LISTA =====
+    window.onYouTubeIframeAPIReady = function() {
+        const player = new YT.Player('videoYouTube', {
+            events: {
+                // Cuando el video termina → redirigir
+                'onStateChange': function(event) {
+                    if (event.data === YT.PlayerState.ENDED) {
+                        console.log('Video terminado');
+                        redirigirAlMenu();
+                    }
+                },
+                // Cuando el video está listo
+                'onReady': function() {
+                    console.log('Video listo');
+                    playerReady = true;
+                    infoCarga.classList.add('oculto');
+
+                    // Fallback por duración (por si el evento ENDED falla)
+                    try {
+                        const duracion = player.getDuration();
+                        if (duracion && duracion > 0) {
+                            setTimeout(() => {
+                                if (!redireccionRealizada) {
+                                    console.log('Redirección por tiempo estimado');
+                                    redirigirAlMenu();
+                                }
+                            }, (duracion * 1000) + 2000);
+                        }
+                    } catch (e) {
+                        console.log('No se pudo obtener la duración');
+                    }
+                },
+                // Si hay error en el video
+                'onError': function(error) {
+                    console.error('Error en YouTube:', error);
+                    fallback.style.display = 'block';
+                    infoCarga.textContent = '⚠️ Error al cargar el video';
+                    btnSaltar.classList.add('mostrar');
+                    btnSaltar.textContent = 'Ir al menú ahora →';
+                }
+            }
+        });
+    };
+
+    // ===== INICIAR CARGA DE LA API =====
+    cargarAPIYouTube();
+
+    // ===== FALLBACK POR TIEMPO MÁXIMO =====
+    const intervalo = setInterval(() => {
+        tiempoEspera++;
+
+        if (tiempoEspera >= TIEMPO_MAXIMO && !redireccionRealizada) {
+            clearInterval(intervalo);
+            console.log('Tiempo máximo alcanzado');
+            redirigirAlMenu();
+        }
+
+        if (tiempoEspera % 30 === 0 && tiempoEspera > 0 && !redireccionRealizada && !playerReady) {
+            infoCarga.textContent = `⏳ Cargando video... ${tiempoEspera}s`;
+        }
+    }, 1000);
+</script>
+
+</body>
+</html>
