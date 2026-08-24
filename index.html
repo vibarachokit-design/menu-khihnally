@@ -132,6 +132,45 @@
             opacity: 0.6;
         }
 
+        /* ===== BARRA DE PROGRESO ===== */
+        .barra-progreso {
+            width: 100%;
+            max-width: 800px;
+            height: 4px;
+            background: #2a1f18;
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .barra-progreso.visible {
+            opacity: 0.8;
+        }
+
+        .barra-progreso .relleno {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #d4a373, #e8c9a0);
+            border-radius: 2px;
+            transition: width 0.3s linear;
+        }
+
+        /* ===== CONTADOR DE TIEMPO ===== */
+        .contador-tiempo {
+            color: #4a3a30;
+            font-size: 0.8em;
+            margin-top: 10px;
+            letter-spacing: 1px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .contador-tiempo.visible {
+            opacity: 0.6;
+        }
+
         /* ===== FALLBACK ===== */
         .fallback {
             display: none;
@@ -163,31 +202,6 @@
             margin-top: 40px;
             letter-spacing: 2px;
         }
-
-        /* ===== BARRA DE PROGRESO (opcional, para feedback visual) ===== */
-        .barra-progreso {
-            width: 100%;
-            max-width: 800px;
-            height: 3px;
-            background: #2a1f18;
-            border-radius: 2px;
-            margin-top: 20px;
-            overflow: hidden;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-
-        .barra-progreso.visible {
-            opacity: 0.6;
-        }
-
-        .barra-progreso .relleno {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #d4a373, #e8c9a0);
-            border-radius: 2px;
-            transition: width 0.3s linear;
-        }
     </style>
 </head>
 
@@ -209,7 +223,7 @@
         <div class="contenedor-video">
             <iframe
                 id="videoYouTube"
-                src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1"
+                src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1"
                 allow="autoplay; encrypted-media; fullscreen"
                 allowfullscreen>
             </iframe>
@@ -220,6 +234,9 @@
             <div class="relleno" id="rellenoProgreso"></div>
         </div>
 
+        <!-- ===== CONTADOR DE TIEMPO ===== -->
+        <div class="contador-tiempo" id="contadorTiempo">⏳ 0s / 12s</div>
+
         <!-- ===== MENSAJE DE CARGA ===== -->
         <div class="info-carga" id="infoCarga">
             <span>●</span> Cargando video de bienvenida <span>●</span>
@@ -227,7 +244,7 @@
 
         <!-- ===== FALLBACK ===== -->
         <div class="fallback" id="fallback">
-            <p>⏳ El video no se pudo cargar automáticamente</p>
+            <p>⏳ ¿El video no se reproduce?</p>
             <p style="margin-top:10px;">
                 Haz clic aquí para ir directamente al
                 <a href="https://espacio-kihnally.ola.click/products">menú de Espacio Kihnally</a>
@@ -237,15 +254,13 @@
         <div class="pie-pagina">ESPACIO KIHNALLY</div>
     </div>
 
-    <!-- ===== JAVASCRIPT (Método mejorado sin API de YouTube) ===== -->
+    <!-- ===== JAVASCRIPT ===== -->
     <script>
         // ===== CONFIGURACIÓN =====
         const URL_MENU = 'https://espacio-kihnally.ola.click/products';
+        const TIEMPO_REDIRECCION = 12; // segundos
         let redireccionRealizada = false;
-        let videoCargado = false;
-        let tiempoInicio = 0;
-        let duracionEstimada = 0;
-        let intervaloProgreso = null;
+        let segundosTranscurridos = 0;
 
         // ===== ELEMENTOS DOM =====
         const contenedorPrincipal = document.getElementById('contenedorPrincipal');
@@ -255,7 +270,7 @@
         const fallback = document.getElementById('fallback');
         const barraProgreso = document.getElementById('barraProgreso');
         const rellenoProgreso = document.getElementById('rellenoProgreso');
-        const iframe = document.getElementById('videoYouTube');
+        const contadorTiempo = document.getElementById('contadorTiempo');
 
         // ===== FUNCIÓN: INICIAR EFECTO FADE Y REDIRIGIR =====
         function iniciarFadeYRedirigir() {
@@ -264,14 +279,9 @@
 
             console.log('✨ Iniciando efecto fade...');
 
-            // Limpiar intervalo de progreso
-            if (intervaloProgreso) {
-                clearInterval(intervaloProgreso);
-                intervaloProgreso = null;
-            }
-
-            // Ocultar barra de progreso
+            // Ocultar barra de progreso y contador
             barraProgreso.classList.remove('visible');
+            contadorTiempo.classList.remove('visible');
 
             // 1. Ocultar el contenido principal con fade
             contenedorPrincipal.classList.add('fade-out');
@@ -293,185 +303,110 @@
             }, 1500);
         }
 
-        // ===== MÉTODO 1: DETECTAR FIN DEL VIDEO CON POSTMESSAGE =====
-        function detectarFinConPostMessage() {
-            // Escuchar mensajes del iframe de YouTube
-            window.addEventListener('message', function(event) {
-                // Verificar que el mensaje viene de YouTube
-                if (event.origin === 'https://www.youtube.com') {
-                    try {
-                        const data = JSON.parse(event.data);
-                        // YouTube envía eventos de estado
-                        // info: 0 = terminado, 1 = reproduciendo, 2 = pausado
-                        if (data.event === 'onStateChange' && data.info === 0) {
-                            console.log('✅ Video terminado (detectado por postMessage)');
-                            iniciarFadeYRedirigir();
-                        }
-                        // Si el video comienza a reproducirse, registrar tiempo
-                        if (data.event === 'onStateChange' && data.info === 1) {
-                            if (!videoCargado) {
-                                videoCargado = true;
-                                tiempoInicio = Date.now();
-                                infoCarga.classList.add('oculto');
-                                barraProgreso.classList.add('visible');
-                                console.log('▶️ Video comenzó a reproducirse');
-                            }
-                        }
-                    } catch (e) {
-                        // Ignorar mensajes que no sean JSON
-                    }
+        // ===== INICIAR CONTADOR Y PROGRESO =====
+        function iniciarContador() {
+            // Mostrar barra de progreso y contador
+            barraProgreso.classList.add('visible');
+            contadorTiempo.classList.add('visible');
+            
+            // Ocultar mensaje de carga
+            infoCarga.classList.add('oculto');
+
+            // Actualizar cada segundo
+            const intervalo = setInterval(() => {
+                segundosTranscurridos++;
+                
+                // Calcular progreso (0% a 100% en 12 segundos)
+                const progreso = Math.min((segundosTranscurridos / TIEMPO_REDIRECCION) * 100, 100);
+                rellenoProgreso.style.width = progreso + '%';
+                
+                // Actualizar contador
+                contadorTiempo.textContent = `⏳ ${segundosTranscurridos}s / ${TIEMPO_REDIRECCION}s`;
+
+                console.log(`⏱️ ${segundosTranscurridos}s de ${TIEMPO_REDIRECCION}s`);
+
+                // Cuando llegue a los 12 segundos, redirigir
+                if (segundosTranscurridos >= TIEMPO_REDIRECCION) {
+                    clearInterval(intervalo);
+                    console.log('✅ Tiempo completado, redirigiendo...');
+                    iniciarFadeYRedirigir();
                 }
-            });
+            }, 1000);
         }
 
-        // ===== MÉTODO 2: DETECTAR FIN CON MUTATION OBSERVER (FALLBACK) =====
-        function detectarFinConObserver() {
-            // Este método observa cambios en el iframe para detectar cuando el video termina
-            let ultimoEstado = '';
-            
-            const observer = new MutationObserver(function() {
-                try {
-                    // Intentar obtener el estado del video desde el iframe
-                    // Nota: Esto puede no funcionar en todos los navegadores
-                    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                    if (iframeDoc) {
-                        // Buscar el elemento del video dentro del iframe
-                        const videoElement = iframeDoc.querySelector('video');
-                        if (videoElement) {
-                            if (videoElement.ended && !redireccionRealizada) {
-                                console.log('✅ Video terminado (detectado por Observer)');
-                                iniciarFadeYRedirigir();
-                            }
-                            if (!videoCargado && videoElement.currentTime > 0) {
-                                videoCargado = true;
-                                tiempoInicio = Date.now();
-                                infoCarga.classList.add('oculto');
-                                barraProgreso.classList.add('visible');
-                                console.log('▶️ Video comenzó (detectado por Observer)');
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // Error de CORS, ignorar
-                }
-            });
-
-            // Observar cambios en el iframe
-            try {
-                observer.observe(iframe, {
-                    attributes: true,
-                    attributeFilter: ['src']
-                });
-            } catch (e) {
-                console.log('Observer no disponible');
-            }
-        }
-
-        // ===== MÉTODO 3: FALLBACK POR DURACIÓN ESTIMADA =====
-        function detectarFinPorDuracion() {
-            // Intentar obtener la duración del video desde la URL
-            // La duración del video "TVKgM2zZqy4" es de aproximadamente 60 segundos
-            // Pero la detectaremos dinámicamente
-            
+        // ===== DETECTAR CUANDO EL VIDEO COMIENZA A REPRODUCIRSE =====
+        function detectarInicioVideo() {
+            // Intentar detectar cuando el video comienza
             let intentos = 0;
-            const maxIntentos = 20; // 20 segundos máximo para detectar
+            const maxIntentos = 10; // 10 segundos de espera
             
-            const intervaloDuracion = setInterval(() => {
+            const verificar = setInterval(() => {
                 intentos++;
                 
-                // Intentar obtener la duración del video de YouTube
-                // Usamos la API de oEmbed de YouTube (pública)
-                if (intentos === 1) {
-                    fetch('https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=TVKgM2zZqy4&format=json')
-                        .then(response => response.json())
-                        .then(data => {
-                            // La duración no viene en oEmbed, pero podemos usar el título
-                            console.log('📹 Video cargado desde oEmbed');
-                        })
-                        .catch(() => {
-                            console.log('No se pudo obtener información del video');
-                        });
-                }
-                
-                // Si el video ya se está reproduciendo, calcular tiempo estimado
-                if (videoCargado) {
-                    const tiempoTranscurrido = (Date.now() - tiempoInicio) / 1000;
-                    
-                    // Actualizar barra de progreso (estimada)
-                    const progreso = Math.min((tiempoTranscurrido / 60) * 100, 95);
-                    rellenoProgreso.style.width = progreso + '%';
-                    
-                    // Si han pasado más de 60 segundos, asumir que el video terminó
-                    if (tiempoTranscurrido > 65 && !redireccionRealizada) {
-                        clearInterval(intervaloDuracion);
-                        console.log('⏰ Redirección por tiempo estimado (65s)');
-                        iniciarFadeYRedirigir();
-                    }
-                }
-                
-                // Si pasaron 20 segundos y el video no cargó, mostrar fallback
-                if (intentos > 20 && !videoCargado && !redireccionRealizada) {
-                    clearInterval(intervaloDuracion);
-                    if (!fallback.style.display || fallback.style.display === 'none') {
-                        fallback.style.display = 'block';
-                        infoCarga.textContent = '⏳ El video está tardando en cargar';
+                // Si el video ya se está reproduciendo, iniciar contador
+                if (!redireccionRealizada) {
+                    // Si han pasado 3 segundos, asumir que el video está reproduciéndose
+                    if (intentos >= 3) {
+                        clearInterval(verificar);
+                        if (!redireccionRealizada) {
+                            console.log('▶️ Video en reproducción, iniciando contador...');
+                            iniciarContador();
+                        }
                     }
                 }
             }, 1000);
         }
 
-        // ===== MÉTODO 4: DETECCIÓN POR CLIC DEL USUARIO (SOLO PARA MÓVILES) =====
-        function detectarInteraccionUsuario() {
-            // En móviles, el autoplay a veces no funciona
-            // Si el usuario hace clic/toca, intentamos reproducir
-            document.addEventListener('click', function() {
-                if (!videoCargado && !redireccionRealizada) {
-                    // Intentar forzar la reproducción enviando un mensaje al iframe
-                    try {
-                        iframe.contentWindow.postMessage(
-                            '{"event":"command","func":"playVideo","args":""}',
-                            'https://www.youtube.com'
-                        );
-                        console.log('📱 Intentando reproducir por interacción del usuario');
-                    } catch (e) {
-                        // Ignorar errores
-                    }
-                }
-            });
-        }
-
-        // ===== INICIALIZAR TODOS LOS MÉTODOS DE DETECCIÓN =====
-        function iniciarDeteccion() {
-            console.log('🚀 Iniciando detección del fin del video...');
-            
-            // Método 1: PostMessage (más confiable)
-            detectarFinConPostMessage();
-            
-            // Método 2: Observer (fallback)
-            detectarFinConObserver();
-            
-            // Método 3: Duración estimada (último recurso)
-            detectarFinPorDuracion();
-            
-            // Método 4: Interacción del usuario (para móviles)
-            detectarInteraccionUsuario();
-            
-            // Fallback general: después de 90 segundos, redirigir forzosamente
-            setTimeout(() => {
-                if (!redireccionRealizada) {
-                    console.log('⏰ Fallback general: 90 segundos alcanzados');
-                    iniciarFadeYRedirigir();
-                }
-            }, 90000);
-        }
-
         // ===== INICIAR =====
-        iniciarDeteccion();
+        console.log('🚀 Página de bienvenida cargada');
+        console.log(`⏱️ Redirigirá automáticamente en ${TIEMPO_REDIRECCION} segundos`);
+        console.log('🔗 Menú: ' + URL_MENU);
 
-        // Mostrar mensaje en consola
-        console.log('📺 Video ID: TVKgM2zZqy4');
-        console.log('🔗 Redirigirá a: ' + URL_MENU);
-        console.log('⏳ Esperando que termine el video...');
+        // Iniciar detección del video
+        detectarInicioVideo();
+
+        // ===== FALLBACK: Si el video no carga, mostrar opción =====
+        setTimeout(() => {
+            if (!redireccionRealizada && segundosTranscurridos === 0) {
+                fallback.style.display = 'block';
+                infoCarga.textContent = '⏳ El video está tardando en cargar';
+            }
+        }, 8000);
+
+        // ===== FALLBACK: Redirigir forzosamente a los 15 segundos =====
+        setTimeout(() => {
+            if (!redireccionRealizada) {
+                console.log('⏰ Fallback: 15 segundos alcanzados, redirigiendo...');
+                iniciarFadeYRedirigir();
+            }
+        }, 15000);
+
+        // ===== PERMITIR QUE EL USUARIO HAGA CLIC PARA SALTAR =====
+        // Si el usuario hace clic en el video o en la página, y han pasado más de 3 segundos,
+        // mostramos un mensaje para que pueda ir al menú
+        document.addEventListener('click', function() {
+            if (segundosTranscurridos > 3 && !redireccionRealizada) {
+                if (!fallback.style.display || fallback.style.display === 'none') {
+                    fallback.innerHTML = `
+                        <p>⏳ ¿Quieres ir al menú ahora?</p>
+                        <p style="margin-top:10px;">
+                            <a href="${URL_MENU}" style="
+                                display: inline-block;
+                                background: #d4a373;
+                                color: #1a1410;
+                                padding: 10px 30px;
+                                border-radius: 50px;
+                                text-decoration: none;
+                                font-weight: bold;
+                            ">Ir al menú →</a>
+                        </p>
+                    `;
+                    fallback.style.display = 'block';
+                }
+            }
+        });
+
+        console.log('✅ Sistema listo. Esperando ' + TIEMPO_REDIRECCION + ' segundos...');
     </script>
 </body>
 </html>
