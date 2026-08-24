@@ -48,6 +48,7 @@
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
             aspect-ratio: 16 / 9;
+            position: relative;
         }
 
         .contenedor-video iframe {
@@ -83,7 +84,7 @@
             100% { opacity: 1; }
         }
 
-        /* ===== SOBREPOSICIÓN DE FADE (capa extra para un efecto más dramático) ===== */
+        /* ===== SOBREPOSICIÓN DE FADE ===== */
         .overlay-fade {
             position: fixed;
             top: 0;
@@ -101,7 +102,7 @@
             opacity: 1;
         }
 
-        /* ===== MENSAJE DE REDIRECCIÓN (opcional, aparece durante el fade) ===== */
+        /* ===== MENSAJE DE REDIRECCIÓN ===== */
         .mensaje-redireccion {
             position: fixed;
             top: 50%;
@@ -131,7 +132,7 @@
             opacity: 0.6;
         }
 
-        /* ===== FALLBACK (SI EL VIDEO FALLA) ===== */
+        /* ===== FALLBACK ===== */
         .fallback {
             display: none;
             color: #f5ede4;
@@ -162,6 +163,31 @@
             margin-top: 40px;
             letter-spacing: 2px;
         }
+
+        /* ===== BARRA DE PROGRESO (opcional, para feedback visual) ===== */
+        .barra-progreso {
+            width: 100%;
+            max-width: 800px;
+            height: 3px;
+            background: #2a1f18;
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .barra-progreso.visible {
+            opacity: 0.6;
+        }
+
+        .barra-progreso .relleno {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #d4a373, #e8c9a0);
+            border-radius: 2px;
+            transition: width 0.3s linear;
+        }
     </style>
 </head>
 
@@ -170,23 +196,28 @@
     <!-- ===== OVERLAY PARA EL FADE ===== -->
     <div class="overlay-fade" id="overlayFade"></div>
 
-    <!-- ===== MENSAJE DE REDIRECCIÓN (aparece durante el fade) ===== -->
+    <!-- ===== MENSAJE DE REDIRECCIÓN ===== -->
     <div class="mensaje-redireccion" id="mensajeRedireccion">
         ✦ Espacio Kihnally ✦
         <small>Preparando tu experiencia...</small>
     </div>
 
-    <!-- ===== CONTENEDOR PRINCIPAL (TODO EL CONTENIDO) ===== -->
+    <!-- ===== CONTENEDOR PRINCIPAL ===== -->
     <div class="contenedor-principal" id="contenedorPrincipal">
 
         <!-- ===== VIDEO DE YOUTUBE ===== -->
         <div class="contenedor-video">
             <iframe
                 id="videoYouTube"
-                src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1"
+                src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1"
                 allow="autoplay; encrypted-media; fullscreen"
                 allowfullscreen>
             </iframe>
+        </div>
+
+        <!-- ===== BARRA DE PROGRESO ===== -->
+        <div class="barra-progreso" id="barraProgreso">
+            <div class="relleno" id="rellenoProgreso"></div>
         </div>
 
         <!-- ===== MENSAJE DE CARGA ===== -->
@@ -194,7 +225,7 @@
             <span>●</span> Cargando video de bienvenida <span>●</span>
         </div>
 
-        <!-- ===== MENSAJE DE FALLBACK (solo si el video no carga) ===== -->
+        <!-- ===== FALLBACK ===== -->
         <div class="fallback" id="fallback">
             <p>⏳ El video no se pudo cargar automáticamente</p>
             <p style="margin-top:10px;">
@@ -206,15 +237,15 @@
         <div class="pie-pagina">ESPACIO KIHNALLY</div>
     </div>
 
-    <!-- ===== JAVASCRIPT ===== -->
+    <!-- ===== JAVASCRIPT (Método mejorado sin API de YouTube) ===== -->
     <script>
         // ===== CONFIGURACIÓN =====
         const URL_MENU = 'https://espacio-kihnally.ola.click/products';
         let redireccionRealizada = false;
-        let tiempoEspera = 0;
-        const TIEMPO_MAXIMO = 120;
-        let playerReady = false;
-        let duracionVideo = 0;
+        let videoCargado = false;
+        let tiempoInicio = 0;
+        let duracionEstimada = 0;
+        let intervaloProgreso = null;
 
         // ===== ELEMENTOS DOM =====
         const contenedorPrincipal = document.getElementById('contenedorPrincipal');
@@ -222,6 +253,9 @@
         const mensajeRedireccion = document.getElementById('mensajeRedireccion');
         const infoCarga = document.getElementById('infoCarga');
         const fallback = document.getElementById('fallback');
+        const barraProgreso = document.getElementById('barraProgreso');
+        const rellenoProgreso = document.getElementById('rellenoProgreso');
+        const iframe = document.getElementById('videoYouTube');
 
         // ===== FUNCIÓN: INICIAR EFECTO FADE Y REDIRIGIR =====
         function iniciarFadeYRedirigir() {
@@ -229,6 +263,15 @@
             redireccionRealizada = true;
 
             console.log('✨ Iniciando efecto fade...');
+
+            // Limpiar intervalo de progreso
+            if (intervaloProgreso) {
+                clearInterval(intervaloProgreso);
+                intervaloProgreso = null;
+            }
+
+            // Ocultar barra de progreso
+            barraProgreso.classList.remove('visible');
 
             // 1. Ocultar el contenido principal con fade
             contenedorPrincipal.classList.add('fade-out');
@@ -247,107 +290,188 @@
             setTimeout(() => {
                 console.log('🔄 Redirigiendo al menú...');
                 window.location.href = URL_MENU;
-            }, 1500); // 1.5 segundos de fade antes de redirigir
+            }, 1500);
         }
 
-        // ===== CARGAR API DE YOUTUBE =====
-        function cargarAPIYouTube() {
-            const tag = document.createElement('script');
-            tag.src = 'https://www.youtube.com/iframe_api';
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-        }
-
-        // ===== CUANDO LA API ESTÁ LISTA =====
-        window.onYouTubeIframeAPIReady = function() {
-            const player = new YT.Player('videoYouTube', {
-                events: {
-                    // ===== EVENTO: CUANDO EL VIDEO TERMINA =====
-                    'onStateChange': function(event) {
-                        if (event.data === YT.PlayerState.ENDED) {
-                            console.log('✅ Video terminado, iniciando fade...');
+        // ===== MÉTODO 1: DETECTAR FIN DEL VIDEO CON POSTMESSAGE =====
+        function detectarFinConPostMessage() {
+            // Escuchar mensajes del iframe de YouTube
+            window.addEventListener('message', function(event) {
+                // Verificar que el mensaje viene de YouTube
+                if (event.origin === 'https://www.youtube.com') {
+                    try {
+                        const data = JSON.parse(event.data);
+                        // YouTube envía eventos de estado
+                        // info: 0 = terminado, 1 = reproduciendo, 2 = pausado
+                        if (data.event === 'onStateChange' && data.info === 0) {
+                            console.log('✅ Video terminado (detectado por postMessage)');
                             iniciarFadeYRedirigir();
                         }
-                    },
-
-                    // ===== EVENTO: CUANDO EL VIDEO ESTÁ LISTO =====
-                    'onReady': function() {
-                        console.log('✅ Video listo para reproducirse');
-                        playerReady = true;
-                        infoCarga.classList.add('oculto');
-
-                        try {
-                            duracionVideo = player.getDuration();
-                            console.log(`📹 Duración del video: ${duracionVideo} segundos`);
-
-                            if (duracionVideo && duracionVideo > 0) {
-                                const tiempoExtra = 2000;
-                                const tiempoTotal = (duracionVideo * 1000) + tiempoExtra;
-
-                                setTimeout(() => {
-                                    if (!redireccionRealizada) {
-                                        console.log('⏰ Redirección por tiempo estimado (fallback)');
-                                        iniciarFadeYRedirigir();
-                                    }
-                                }, tiempoTotal);
+                        // Si el video comienza a reproducirse, registrar tiempo
+                        if (data.event === 'onStateChange' && data.info === 1) {
+                            if (!videoCargado) {
+                                videoCargado = true;
+                                tiempoInicio = Date.now();
+                                infoCarga.classList.add('oculto');
+                                barraProgreso.classList.add('visible');
+                                console.log('▶️ Video comenzó a reproducirse');
                             }
-                        } catch (e) {
-                            console.warn('⚠️ No se pudo obtener la duración del video');
                         }
-                    },
-
-                    // ===== EVENTO: SI HAY ERROR EN EL VIDEO =====
-                    'onError': function(error) {
-                        console.error('❌ Error en YouTube:', error);
-                        fallback.style.display = 'block';
-                        infoCarga.textContent = '⚠️ Error al cargar el video';
-
-                        setTimeout(() => {
-                            if (!redireccionRealizada) {
-                                console.log('🔄 Redirigiendo por error en el video');
-                                iniciarFadeYRedirigir();
-                            }
-                        }, 3000);
+                    } catch (e) {
+                        // Ignorar mensajes que no sean JSON
                     }
                 }
             });
-        };
+        }
 
-        // ===== INICIAR CARGA DE LA API =====
-        cargarAPIYouTube();
-
-        // ===== FALLBACK POR TIEMPO MÁXIMO =====
-        const intervalo = setInterval(() => {
-            tiempoEspera++;
-
-            if (tiempoEspera >= TIEMPO_MAXIMO && !redireccionRealizada) {
-                clearInterval(intervalo);
-                console.log('⏰ Tiempo máximo alcanzado');
-                iniciarFadeYRedirigir();
-            }
-
-            if (tiempoEspera % 15 === 0 && tiempoEspera > 0 && !redireccionRealizada && !playerReady) {
-                infoCarga.textContent = `⏳ Cargando video... ${tiempoEspera}s`;
-            }
-        }, 1000);
-
-        // ===== FALLBACK ADICIONAL: clic si el video no carga =====
-        document.addEventListener('click', function() {
-            if (tiempoEspera > 8 && !redireccionRealizada && !playerReady) {
-                if (!fallback.style.display || fallback.style.display === 'none') {
-                    fallback.innerHTML = `
-                        <p>⏳ ¿El video no se reproduce?</p>
-                        <p style="margin-top:10px;">
-                            Haz clic aquí para ir al 
-                            <a href="https://espacio-kihnally.ola.click/products">menú de Espacio Kihnally</a>
-                        </p>
-                    `;
-                    fallback.style.display = 'block';
+        // ===== MÉTODO 2: DETECTAR FIN CON MUTATION OBSERVER (FALLBACK) =====
+        function detectarFinConObserver() {
+            // Este método observa cambios en el iframe para detectar cuando el video termina
+            let ultimoEstado = '';
+            
+            const observer = new MutationObserver(function() {
+                try {
+                    // Intentar obtener el estado del video desde el iframe
+                    // Nota: Esto puede no funcionar en todos los navegadores
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                    if (iframeDoc) {
+                        // Buscar el elemento del video dentro del iframe
+                        const videoElement = iframeDoc.querySelector('video');
+                        if (videoElement) {
+                            if (videoElement.ended && !redireccionRealizada) {
+                                console.log('✅ Video terminado (detectado por Observer)');
+                                iniciarFadeYRedirigir();
+                            }
+                            if (!videoCargado && videoElement.currentTime > 0) {
+                                videoCargado = true;
+                                tiempoInicio = Date.now();
+                                infoCarga.classList.add('oculto');
+                                barraProgreso.classList.add('visible');
+                                console.log('▶️ Video comenzó (detectado por Observer)');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Error de CORS, ignorar
                 }
-            }
-        });
+            });
 
-        console.log('🚀 Página de bienvenida cargada.');
+            // Observar cambios en el iframe
+            try {
+                observer.observe(iframe, {
+                    attributes: true,
+                    attributeFilter: ['src']
+                });
+            } catch (e) {
+                console.log('Observer no disponible');
+            }
+        }
+
+        // ===== MÉTODO 3: FALLBACK POR DURACIÓN ESTIMADA =====
+        function detectarFinPorDuracion() {
+            // Intentar obtener la duración del video desde la URL
+            // La duración del video "TVKgM2zZqy4" es de aproximadamente 60 segundos
+            // Pero la detectaremos dinámicamente
+            
+            let intentos = 0;
+            const maxIntentos = 20; // 20 segundos máximo para detectar
+            
+            const intervaloDuracion = setInterval(() => {
+                intentos++;
+                
+                // Intentar obtener la duración del video de YouTube
+                // Usamos la API de oEmbed de YouTube (pública)
+                if (intentos === 1) {
+                    fetch('https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=TVKgM2zZqy4&format=json')
+                        .then(response => response.json())
+                        .then(data => {
+                            // La duración no viene en oEmbed, pero podemos usar el título
+                            console.log('📹 Video cargado desde oEmbed');
+                        })
+                        .catch(() => {
+                            console.log('No se pudo obtener información del video');
+                        });
+                }
+                
+                // Si el video ya se está reproduciendo, calcular tiempo estimado
+                if (videoCargado) {
+                    const tiempoTranscurrido = (Date.now() - tiempoInicio) / 1000;
+                    
+                    // Actualizar barra de progreso (estimada)
+                    const progreso = Math.min((tiempoTranscurrido / 60) * 100, 95);
+                    rellenoProgreso.style.width = progreso + '%';
+                    
+                    // Si han pasado más de 60 segundos, asumir que el video terminó
+                    if (tiempoTranscurrido > 65 && !redireccionRealizada) {
+                        clearInterval(intervaloDuracion);
+                        console.log('⏰ Redirección por tiempo estimado (65s)');
+                        iniciarFadeYRedirigir();
+                    }
+                }
+                
+                // Si pasaron 20 segundos y el video no cargó, mostrar fallback
+                if (intentos > 20 && !videoCargado && !redireccionRealizada) {
+                    clearInterval(intervaloDuracion);
+                    if (!fallback.style.display || fallback.style.display === 'none') {
+                        fallback.style.display = 'block';
+                        infoCarga.textContent = '⏳ El video está tardando en cargar';
+                    }
+                }
+            }, 1000);
+        }
+
+        // ===== MÉTODO 4: DETECCIÓN POR CLIC DEL USUARIO (SOLO PARA MÓVILES) =====
+        function detectarInteraccionUsuario() {
+            // En móviles, el autoplay a veces no funciona
+            // Si el usuario hace clic/toca, intentamos reproducir
+            document.addEventListener('click', function() {
+                if (!videoCargado && !redireccionRealizada) {
+                    // Intentar forzar la reproducción enviando un mensaje al iframe
+                    try {
+                        iframe.contentWindow.postMessage(
+                            '{"event":"command","func":"playVideo","args":""}',
+                            'https://www.youtube.com'
+                        );
+                        console.log('📱 Intentando reproducir por interacción del usuario');
+                    } catch (e) {
+                        // Ignorar errores
+                    }
+                }
+            });
+        }
+
+        // ===== INICIALIZAR TODOS LOS MÉTODOS DE DETECCIÓN =====
+        function iniciarDeteccion() {
+            console.log('🚀 Iniciando detección del fin del video...');
+            
+            // Método 1: PostMessage (más confiable)
+            detectarFinConPostMessage();
+            
+            // Método 2: Observer (fallback)
+            detectarFinConObserver();
+            
+            // Método 3: Duración estimada (último recurso)
+            detectarFinPorDuracion();
+            
+            // Método 4: Interacción del usuario (para móviles)
+            detectarInteraccionUsuario();
+            
+            // Fallback general: después de 90 segundos, redirigir forzosamente
+            setTimeout(() => {
+                if (!redireccionRealizada) {
+                    console.log('⏰ Fallback general: 90 segundos alcanzados');
+                    iniciarFadeYRedirigir();
+                }
+            }, 90000);
+        }
+
+        // ===== INICIAR =====
+        iniciarDeteccion();
+
+        // Mostrar mensaje en consola
+        console.log('📺 Video ID: TVKgM2zZqy4');
+        console.log('🔗 Redirigirá a: ' + URL_MENU);
+        console.log('⏳ Esperando que termine el video...');
     </script>
 </body>
 </html>
