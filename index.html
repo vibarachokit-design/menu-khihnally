@@ -21,11 +21,27 @@
             background: #1a1410;
             font-family: 'Arial', sans-serif;
             padding: 20px;
+            margin: 0;
+            position: relative;
+        }
+
+        /* ===== CONTENEDOR PRINCIPAL (para el fade) ===== */
+        .contenedor-principal {
+            max-width: 800px;
+            width: 100%;
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .contenedor-principal.fade-out {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
         }
 
         /* ===== CONTENEDOR DEL VIDEO ===== */
         .contenedor-video {
-            max-width: 800px;
             width: 100%;
             background: #000;
             border-radius: 16px;
@@ -62,65 +78,57 @@
         }
 
         @keyframes puntos {
-            0%,
-            20% {
-                opacity: 0;
-            }
-            40% {
-                opacity: 1;
-            }
-            100% {
-                opacity: 1;
-            }
+            0%, 20% { opacity: 0; }
+            40% { opacity: 1; }
+            100% { opacity: 1; }
         }
 
-        /* ===== MENSAJE DE REDIRECCIÓN ===== */
+        /* ===== SOBREPOSICIÓN DE FADE (capa extra para un efecto más dramático) ===== */
+        .overlay-fade {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1410;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            transition: opacity 1s ease;
+        }
+
+        .overlay-fade.activo {
+            opacity: 1;
+        }
+
+        /* ===== MENSAJE DE REDIRECCIÓN (opcional, aparece durante el fade) ===== */
         .mensaje-redireccion {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: #d4a373;
-            text-align: center;
-            margin-top: 20px;
-            font-size: 1.1em;
-            display: none;
+            font-size: 1.5em;
             font-weight: bold;
+            letter-spacing: 2px;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease;
+            text-align: center;
         }
 
-        .mensaje-redireccion.mostrar {
+        .mensaje-redireccion.activo {
+            opacity: 1;
+        }
+
+        .mensaje-redireccion small {
             display: block;
-            animation: parpadeo 1s ease-in-out infinite;
-        }
-
-        @keyframes parpadeo {
-            0%,
-            100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.3;
-            }
-        }
-
-        /* ===== BOTÓN SALTAR ===== */
-        .btn-saltar {
-            background: transparent;
+            font-size: 0.5em;
+            font-weight: normal;
             color: #f5ede4;
-            border: 1px solid #4a3a30;
-            padding: 10px 25px;
-            border-radius: 50px;
-            cursor: pointer;
-            margin-top: 15px;
-            font-size: 0.9em;
-            transition: all 0.3s;
-            display: none;
-        }
-
-        .btn-saltar:hover {
-            background: #d4a373;
-            color: #1a1410;
-            border-color: #d4a373;
-        }
-
-        .btn-saltar.mostrar {
-            display: inline-block;
+            margin-top: 10px;
+            opacity: 0.6;
         }
 
         /* ===== FALLBACK (SI EL VIDEO FALLA) ===== */
@@ -133,6 +141,7 @@
             margin-top: 20px;
             text-align: center;
             border: 1px solid #4a3a30;
+            max-width: 500px;
         }
 
         .fallback a {
@@ -146,151 +155,199 @@
         .fallback a:hover {
             color: #e8c9a0;
         }
+
+        .pie-pagina {
+            color: #4a3a30;
+            font-size: 0.7em;
+            margin-top: 40px;
+            letter-spacing: 2px;
+        }
     </style>
 </head>
 
 <body>
 
-    <!-- ===== VIDEO DE YOUTUBE ===== -->
-    <div class="contenedor-video">
-        <iframe
-        id="videoYouTube"
-        src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1"
-        allow="autoplay; encrypted-media; fullscreen"
-        allowfullscreen>
-    </iframe>
-</div>
+    <!-- ===== OVERLAY PARA EL FADE ===== -->
+    <div class="overlay-fade" id="overlayFade"></div>
 
-<!-- ===== MENSAJE DE CARGA ===== -->
-<div class="info-carga" id="infoCarga">
-    <span>●</span> Cargando video de bienvenida <span>●</span>
-</div>
+    <!-- ===== MENSAJE DE REDIRECCIÓN (aparece durante el fade) ===== -->
+    <div class="mensaje-redireccion" id="mensajeRedireccion">
+        ✦ Espacio Kihnally ✦
+        <small>Preparando tu experiencia...</small>
+    </div>
 
-<!-- ===== MENSAJE DE REDIRECCIÓN ===== -->
-<div class="mensaje-redireccion" id="mensajeRedireccion">
-    ✨ ¡Gracias por visitarnos! Redirigiendo al menú...
-</div>
+    <!-- ===== CONTENEDOR PRINCIPAL (TODO EL CONTENIDO) ===== -->
+    <div class="contenedor-principal" id="contenedorPrincipal">
 
-<!-- ===== BOTÓN PARA SALTAR EL VIDEO ===== -->
-<button class="btn-saltar" id="btnSaltar" onclick="redirigirAlMenu()">
-    Saltar al menú →
-</button>
+        <!-- ===== VIDEO DE YOUTUBE ===== -->
+        <div class="contenedor-video">
+            <iframe
+                id="videoYouTube"
+                src="https://www.youtube.com/embed/TVKgM2zZqy4?autoplay=1&rel=0&modestbranding=1&playsinline=1"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowfullscreen>
+            </iframe>
+        </div>
 
-<!-- ===== MENSAJE DE FALLBACK ===== -->
-<div class="fallback" id="fallback">
-    <p>⏳ El video no se pudo cargar automáticamente</p>
-    <p style="margin-top:10px;">
-        Haz clic aquí para ir directamente al
-        <a href="https://espacio-kihnally.ola.click/products">menú de Espacio Kihnally</a>
-    </p>
-</div>
+        <!-- ===== MENSAJE DE CARGA ===== -->
+        <div class="info-carga" id="infoCarga">
+            <span>●</span> Cargando video de bienvenida <span>●</span>
+        </div>
 
-<!-- ===== JAVASCRIPT ===== -->
-<script>
-    // ===== CONFIGURACIÓN =====
-    const URL_MENU = 'https://espacio-kihnally.ola.click/products';
-    let redireccionRealizada = false;
-    let tiempoEspera = 0;
-    const TIEMPO_MAXIMO = 120; // segundos
-    let playerReady = false;
+        <!-- ===== MENSAJE DE FALLBACK (solo si el video no carga) ===== -->
+        <div class="fallback" id="fallback">
+            <p>⏳ El video no se pudo cargar automáticamente</p>
+            <p style="margin-top:10px;">
+                Haz clic aquí para ir directamente al
+                <a href="https://espacio-kihnally.ola.click/products">menú de Espacio Kihnally</a>
+            </p>
+        </div>
 
-    // ===== ELEMENTOS DOM =====
-    const infoCarga = document.getElementById('infoCarga');
-    const mensajeRedireccion = document.getElementById('mensajeRedireccion');
-    const fallback = document.getElementById('fallback');
-    const btnSaltar = document.getElementById('btnSaltar');
+        <div class="pie-pagina">ESPACIO KIHNALLY</div>
+    </div>
 
-    // ===== FUNCIÓN PRINCIPAL: REDIRIGIR =====
-    function redirigirAlMenu() {
-        if (redireccionRealizada) return;
-        redireccionRealizada = true;
+    <!-- ===== JAVASCRIPT ===== -->
+    <script>
+        // ===== CONFIGURACIÓN =====
+        const URL_MENU = 'https://espacio-kihnally.ola.click/products';
+        let redireccionRealizada = false;
+        let tiempoEspera = 0;
+        const TIEMPO_MAXIMO = 120;
+        let playerReady = false;
+        let duracionVideo = 0;
 
-        infoCarga.classList.add('oculto');
-        mensajeRedireccion.classList.add('mostrar');
-        btnSaltar.classList.remove('mostrar');
+        // ===== ELEMENTOS DOM =====
+        const contenedorPrincipal = document.getElementById('contenedorPrincipal');
+        const overlayFade = document.getElementById('overlayFade');
+        const mensajeRedireccion = document.getElementById('mensajeRedireccion');
+        const infoCarga = document.getElementById('infoCarga');
+        const fallback = document.getElementById('fallback');
 
-        setTimeout(() => {
-            window.location.href = URL_MENU;
-        }, 800);
-    }
+        // ===== FUNCIÓN: INICIAR EFECTO FADE Y REDIRIGIR =====
+        function iniciarFadeYRedirigir() {
+            if (redireccionRealizada) return;
+            redireccionRealizada = true;
 
-    // ===== MOSTRAR BOTÓN "SALTAR" A LOS 5 SEGUNDOS =====
-    setTimeout(() => {
-        if (!redireccionRealizada) {
-            btnSaltar.classList.add('mostrar');
+            console.log('✨ Iniciando efecto fade...');
+
+            // 1. Ocultar el contenido principal con fade
+            contenedorPrincipal.classList.add('fade-out');
+
+            // 2. Activar el overlay oscuro
+            setTimeout(() => {
+                overlayFade.classList.add('activo');
+            }, 200);
+
+            // 3. Mostrar el mensaje de redirección
+            setTimeout(() => {
+                mensajeRedireccion.classList.add('activo');
+            }, 500);
+
+            // 4. Redirigir después de que el fade esté completo
+            setTimeout(() => {
+                console.log('🔄 Redirigiendo al menú...');
+                window.location.href = URL_MENU;
+            }, 1500); // 1.5 segundos de fade antes de redirigir
         }
-    }, 5000);
 
-    // ===== CARGAR API DE YOUTUBE =====
-    function cargarAPIYouTube() {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        const firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-    }
+        // ===== CARGAR API DE YOUTUBE =====
+        function cargarAPIYouTube() {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
 
-    // ===== CUANDO LA API ESTÁ LISTA =====
-    window.onYouTubeIframeAPIReady = function() {
-        const player = new YT.Player('videoYouTube', {
-            events: {
-                // Cuando el video termina → redirigir
-                'onStateChange': function(event) {
-                    if (event.data === YT.PlayerState.ENDED) {
-                        console.log('Video terminado');
-                        redirigirAlMenu();
-                    }
-                },
-                // Cuando el video está listo
-                'onReady': function() {
-                    console.log('Video listo');
-                    playerReady = true;
-                    infoCarga.classList.add('oculto');
-
-                    // Fallback por duración (por si el evento ENDED falla)
-                    try {
-                        const duracion = player.getDuration();
-                        if (duracion && duracion > 0) {
-                            setTimeout(() => {
-                                if (!redireccionRealizada) {
-                                    console.log('Redirección por tiempo estimado');
-                                    redirigirAlMenu();
-                                }
-                            }, (duracion * 1000) + 2000);
+        // ===== CUANDO LA API ESTÁ LISTA =====
+        window.onYouTubeIframeAPIReady = function() {
+            const player = new YT.Player('videoYouTube', {
+                events: {
+                    // ===== EVENTO: CUANDO EL VIDEO TERMINA =====
+                    'onStateChange': function(event) {
+                        if (event.data === YT.PlayerState.ENDED) {
+                            console.log('✅ Video terminado, iniciando fade...');
+                            iniciarFadeYRedirigir();
                         }
-                    } catch (e) {
-                        console.log('No se pudo obtener la duración');
+                    },
+
+                    // ===== EVENTO: CUANDO EL VIDEO ESTÁ LISTO =====
+                    'onReady': function() {
+                        console.log('✅ Video listo para reproducirse');
+                        playerReady = true;
+                        infoCarga.classList.add('oculto');
+
+                        try {
+                            duracionVideo = player.getDuration();
+                            console.log(`📹 Duración del video: ${duracionVideo} segundos`);
+
+                            if (duracionVideo && duracionVideo > 0) {
+                                const tiempoExtra = 2000;
+                                const tiempoTotal = (duracionVideo * 1000) + tiempoExtra;
+
+                                setTimeout(() => {
+                                    if (!redireccionRealizada) {
+                                        console.log('⏰ Redirección por tiempo estimado (fallback)');
+                                        iniciarFadeYRedirigir();
+                                    }
+                                }, tiempoTotal);
+                            }
+                        } catch (e) {
+                            console.warn('⚠️ No se pudo obtener la duración del video');
+                        }
+                    },
+
+                    // ===== EVENTO: SI HAY ERROR EN EL VIDEO =====
+                    'onError': function(error) {
+                        console.error('❌ Error en YouTube:', error);
+                        fallback.style.display = 'block';
+                        infoCarga.textContent = '⚠️ Error al cargar el video';
+
+                        setTimeout(() => {
+                            if (!redireccionRealizada) {
+                                console.log('🔄 Redirigiendo por error en el video');
+                                iniciarFadeYRedirigir();
+                            }
+                        }, 3000);
                     }
-                },
-                // Si hay error en el video
-                'onError': function(error) {
-                    console.error('Error en YouTube:', error);
+                }
+            });
+        };
+
+        // ===== INICIAR CARGA DE LA API =====
+        cargarAPIYouTube();
+
+        // ===== FALLBACK POR TIEMPO MÁXIMO =====
+        const intervalo = setInterval(() => {
+            tiempoEspera++;
+
+            if (tiempoEspera >= TIEMPO_MAXIMO && !redireccionRealizada) {
+                clearInterval(intervalo);
+                console.log('⏰ Tiempo máximo alcanzado');
+                iniciarFadeYRedirigir();
+            }
+
+            if (tiempoEspera % 15 === 0 && tiempoEspera > 0 && !redireccionRealizada && !playerReady) {
+                infoCarga.textContent = `⏳ Cargando video... ${tiempoEspera}s`;
+            }
+        }, 1000);
+
+        // ===== FALLBACK ADICIONAL: clic si el video no carga =====
+        document.addEventListener('click', function() {
+            if (tiempoEspera > 8 && !redireccionRealizada && !playerReady) {
+                if (!fallback.style.display || fallback.style.display === 'none') {
+                    fallback.innerHTML = `
+                        <p>⏳ ¿El video no se reproduce?</p>
+                        <p style="margin-top:10px;">
+                            Haz clic aquí para ir al 
+                            <a href="https://espacio-kihnally.ola.click/products">menú de Espacio Kihnally</a>
+                        </p>
+                    `;
                     fallback.style.display = 'block';
-                    infoCarga.textContent = '⚠️ Error al cargar el video';
-                    btnSaltar.classList.add('mostrar');
-                    btnSaltar.textContent = 'Ir al menú ahora →';
                 }
             }
         });
-    };
 
-    // ===== INICIAR CARGA DE LA API =====
-    cargarAPIYouTube();
-
-    // ===== FALLBACK POR TIEMPO MÁXIMO =====
-    const intervalo = setInterval(() => {
-        tiempoEspera++;
-
-        if (tiempoEspera >= TIEMPO_MAXIMO && !redireccionRealizada) {
-            clearInterval(intervalo);
-            console.log('Tiempo máximo alcanzado');
-            redirigirAlMenu();
-        }
-
-        if (tiempoEspera % 30 === 0 && tiempoEspera > 0 && !redireccionRealizada && !playerReady) {
-            infoCarga.textContent = `⏳ Cargando video... ${tiempoEspera}s`;
-        }
-    }, 1000);
-</script>
-
+        console.log('🚀 Página de bienvenida cargada.');
+    </script>
 </body>
 </html>
